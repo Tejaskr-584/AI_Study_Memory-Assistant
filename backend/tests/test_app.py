@@ -20,13 +20,21 @@ class FakeGeminiClient:
         return "A process is a running program explained by Gemini."
 
 
+class FakeUnavailableClient:
+    def is_available(self):
+        return False
+
+    def generate_response(self, prompt):
+        return None
+
+
 class AppFlowTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         memory_path = os.path.join(self.temp_dir.name, "memory.json")
         memory = UserMemory(memory_file=memory_path)
         app.user_memory = memory
-        app.ai_logic = AILogic(memory)
+        app.ai_logic = AILogic(memory, llm_client=FakeUnavailableClient())
         app.quiz_generator = QuizGenerator(memory)
         self.client = app.app.test_client()
 
@@ -73,6 +81,10 @@ class AppFlowTests(unittest.TestCase):
         response = self.client.post("/api/chat", json={"message": "What is a process?"})
         self.assertEqual(response.json["data"]["response_source"], "gemini")
         self.assertIn("Gemini", response.json["data"]["response"])
+
+    def test_topic_detection_uses_whole_words(self):
+        topics = app.ai_logic.detect_topics("Explain photosynthesis simply")
+        self.assertEqual(topics, ["General Learning"])
 
 
 if __name__ == "__main__":

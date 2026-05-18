@@ -10,6 +10,7 @@ This file handles:
 from memory import UserMemory
 from llm_client import GeminiClient
 import random
+import re
 
 class AILogic:
     """
@@ -31,12 +32,12 @@ class AILogic:
         # When user message contains these keywords, we know what topic they're asking about
         self.topic_keywords = {
             "Operating Systems": [
-                "process", "thread", "kernel", "os", "operating system",
-                "memory management", "context switch", "interrupt", "scheduling",
+                "process", "processes", "thread", "threads", "kernel", "os", "operating system",
+                "memory management", "context switch", "context switching", "interrupt", "scheduling",
                 "cpu", "processor", "system call"
             ],
             "Databases": [
-                "database", "sql", "query", "table", "schema", "index",
+                "database", "databases", "sql", "query", "queries", "table", "tables", "schema", "index",
                 "join", "transaction", "acid", "relationship", "primary key",
                 "foreign key", "normalization", "db"
             ],
@@ -46,7 +47,7 @@ class AILogic:
                 "latency", "firewall", "encryption"
             ],
             "Data Structures": [
-                "array", "list", "queue", "stack", "tree", "graph", "hash",
+                "array", "arrays", "list", "queue", "queues", "stack", "stacks", "tree", "trees", "graph", "graphs", "hash",
                 "linked list", "binary tree", "heap", "algorithm", "complexity",
                 "time complexity", "space complexity", "big o"
             ],
@@ -157,7 +158,8 @@ class AILogic:
         # Check each topic's keywords
         for topic, keywords in self.topic_keywords.items():
             for keyword in keywords:
-                if keyword in message_lower:
+                pattern = rf"(?<!\w){re.escape(keyword)}(?!\w)"
+                if re.search(pattern, message_lower):
                     if topic not in detected_topics:
                         detected_topics.append(topic)
                     break  # Found this topic, move to next
@@ -172,7 +174,8 @@ class AILogic:
         """Return the most specific known concept mentioned for a topic."""
         message_lower = message.lower()
         for concept in self.concept_responses.get(topic, {}):
-            if concept in message_lower:
+            pattern = rf"(?<!\w){re.escape(concept)}(?!\w)"
+            if re.search(pattern, message_lower):
                 return concept
         return None
     
