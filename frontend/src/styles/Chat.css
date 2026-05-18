@@ -1,0 +1,404 @@
+/* frontend/src/styles/Chat.css */
+/**
+ * AI Study Memory Assistant - Chat Component Styles
+ * 
+ * Features:
+ * - Dark theme with gradients
+ * - Glassmorphism effects
+ * - Smooth animations
+ * - Responsive design
+ * - Memory-aware visual indicators
+ */
+
+/* ===================================
+   CHAT CONTAINER & LAYOUT
+   =================================== */
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+/* ===================================
+   HEADER
+   =================================== */
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+}
+
+.chat-header h1 {
+  margin: 0;
+  font-size: 24px;
+  color: #fff;
+  font-weight: 600;
+  background: linear-gradient(135deg, #00d4ff 0%, #0099ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.clear-btn {
+  padding: 8px 16px;
+  background: rgba(255, 59, 48, 0.2);
+  border: 1px solid rgba(255, 59, 48, 0.4);
+  border-radius: 8px;
+  color: #ff3b30;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.clear-btn:hover {
+  background: rgba(255, 59, 48, 0.3);
+  border-color: rgba(255, 59, 48, 0.6);
+  transform: scale(1.05);
+}
+
+/* ===================================
+   MESSAGES AREA
+   =================================== */
+
+.messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(15, 20, 25, 0.5) 0%, rgba(26, 31, 46, 0.5) 100%);
+}
+
+/* Custom scrollbar */
+.messages-area::-webkit-scrollbar {
+  width: 8px;
+}
+
+.messages-area::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.messages-area::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.4);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.messages-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.7);
+}
+
+/* ===================================
+   MESSAGE BUBBLES
+   =================================== */
+
+.message-container {
+  display: flex;
+  animation: slideIn 0.3s ease;
+}
+
+.message-container.user {
+  justify-content: flex-end;
+}
+
+.message-container.assistant {
+  justify-content: flex-start;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Message bubble styling */
+.message-bubble {
+  max-width: 70%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  word-wrap: break-word;
+  line-height: 1.4;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+/* User message bubble */
+.user-bubble {
+  background: linear-gradient(135deg, #0099ff 0%, #00d4ff 100%);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.user-bubble:hover {
+  transform: translateX(-5px);
+  box-shadow: 0 8px 20px rgba(0, 153, 255, 0.4);
+}
+
+/* Assistant message bubble */
+.assistant-bubble {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #e0e0e0;
+  backdrop-filter: blur(10px);
+  border-bottom-left-radius: 4px;
+}
+
+.assistant-bubble:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Message text */
+.message-text {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ===================================
+   MEMORY INDICATOR
+   =================================== */
+
+.memory-indicator {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.memory-badge {
+  display: inline-block;
+  background: rgba(50, 205, 50, 0.2);
+  border: 1px solid rgba(50, 205, 50, 0.5);
+  color: #32cd32;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  animation: memoryGlow 1s ease-in-out;
+}
+
+@keyframes memoryGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(50, 205, 50, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(50, 205, 50, 0.8);
+  }
+}
+
+/* Topics detected (debug info) */
+.topics-detected {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ===================================
+   LOADING STATE
+   =================================== */
+
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+
+.typing-indicator span {
+  width: 8px;
+  height: 8px;
+  background: rgba(0, 212, 255, 0.7);
+  border-radius: 50%;
+  animation: typing 1.4s infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-10px);
+  }
+}
+
+/* ===================================
+   INPUT AREA
+   =================================== */
+
+.input-area {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+/* Input container with input + button */
+.input-container {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* Message input field */
+.message-input {
+  flex: 1;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  color: #e0e0e0;
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  transition: all 0.3s ease;
+  max-height: 100px;
+}
+
+.message-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.message-input:focus {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(0, 212, 255, 0.5);
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+}
+
+.message-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Send button */
+.send-button {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #0099ff 0%, #00d4ff 100%);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(0, 153, 255, 0.3);
+  white-space: nowrap;
+}
+
+.send-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 153, 255, 0.5);
+}
+
+.send-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.send-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Input hint */
+.input-hint {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+  font-style: italic;
+}
+
+/* ===================================
+   ERROR BANNER
+   =================================== */
+
+.error-banner {
+  padding: 12px;
+  background: rgba(255, 59, 48, 0.15);
+  border: 1px solid rgba(255, 59, 48, 0.4);
+  border-radius: 8px;
+  color: #ff9999;
+  font-size: 13px;
+  margin-bottom: 12px;
+  animation: shake 0.3s ease;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* ===================================
+   RESPONSIVE DESIGN
+   =================================== */
+
+@media (max-width: 768px) {
+  .message-bubble {
+    max-width: 85%;
+  }
+
+  .chat-header h1 {
+    font-size: 20px;
+  }
+
+  .message-text {
+    font-size: 14px;
+  }
+
+  .send-button {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .chat-container {
+    border-radius: 0;
+  }
+
+  .message-bubble {
+    max-width: 100%;
+  }
+
+  .messages-area {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .input-area {
+    padding: 12px;
+  }
+
+  .chat-header {
+    padding: 16px;
+  }
+}
