@@ -17,7 +17,9 @@
 .chat-container {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 0 1 790px;
+  height: min(620px, 100%);
+  max-height: 620px;
   min-height: 0;
   width: 100%;
   max-width: 790px;
@@ -77,8 +79,10 @@
 
 .messages-area {
   flex: 1;
+  height: 0;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   display: flex;
   flex-direction: column;
