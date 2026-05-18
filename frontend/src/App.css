@@ -24,12 +24,13 @@ body {
   background: linear-gradient(135deg, #0a0e17 0%, #141b2b 100%);
   color: #e0e0e0;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 #root {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 /* ===================================
@@ -40,7 +41,8 @@ body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: linear-gradient(135deg, #0a0e17 0%, #141b2b 100%);
 }
 
@@ -49,6 +51,7 @@ body {
    =================================== */
 
 .app-header {
+  flex: 0 0 auto;
   background: rgba(255, 255, 255, 0.05);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
@@ -127,6 +130,7 @@ body {
    =================================== */
 
 .tab-navigation {
+  flex: 0 0 auto;
   background: rgba(255, 255, 255, 0.03);
   border-bottom: 2px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
@@ -199,6 +203,7 @@ body {
 
 .app-main {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   display: flex;
   justify-content: center;
@@ -206,6 +211,8 @@ body {
 }
 
 .content-container {
+  flex: 1;
+  min-height: 0;
   width: 100%;
   max-width: 1200px;
   padding: 20px;
@@ -220,6 +227,7 @@ body {
    =================================== */
 
 .app-footer {
+  flex: 0 0 auto;
   background: rgba(255, 255, 255, 0.05);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
@@ -330,7 +338,7 @@ body {
   }
 
   .app-main {
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .content-container {
