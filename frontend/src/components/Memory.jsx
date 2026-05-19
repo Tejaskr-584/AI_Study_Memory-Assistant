@@ -27,7 +27,14 @@ const Memory = () => {
     recent_mistakes: [],
     user_preferences: {},
     all_topics: [],
-    chat_history_length: 0
+    chat_history_length: 0,
+    quiz_accuracy: 0,
+    learning_streak: 0,
+    best_streak: 0,
+    topic_mastery: [],
+    difficulty_performance: {},
+    recent_activity: [],
+    study_recommendations: []
   });
 
   // Whether data is being fetched
@@ -113,6 +120,12 @@ const Memory = () => {
       return '#ff6b6b'; // Red for weak topics
     }
     return '#4ecdc4'; // Teal for strong topics
+  };
+
+  const getMasteryLabel = (value) => {
+    if (value >= 80) return 'Strong';
+    if (value >= 55) return 'Growing';
+    return 'Needs Focus';
   };
 
   /**
@@ -264,6 +277,18 @@ const Memory = () => {
         value: memoryData.chat_history_length,
         icon: '💬',
         color: '#a8e6cf'
+      },
+      {
+        label: 'Quiz Accuracy',
+        value: `${memoryData.quiz_accuracy || 0}%`,
+        icon: '✓',
+        color: '#8fd694'
+      },
+      {
+        label: 'Learning Streak',
+        value: memoryData.learning_streak || 0,
+        icon: '↗',
+        color: '#ffc857'
       }
     ];
 
@@ -274,6 +299,104 @@ const Memory = () => {
             <div className="stat-icon">{stat.icon}</div>
             <div className="stat-value">{stat.value}</div>
             <div className="stat-label">{stat.label}</div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderRecommendations = () => {
+    const recommendations = memoryData.study_recommendations || [];
+
+    return (
+      <div className="recommendation-list">
+        {recommendations.map((recommendation, idx) => (
+          <div key={idx} className="recommendation-card">
+            <span className="recommendation-dot"></span>
+            <p>{recommendation}</p>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderTopicMastery = () => {
+    const topics = memoryData.topic_mastery || [];
+
+    if (topics.length === 0) {
+      return (
+        <div className="empty-state">
+          <p>Take a quiz to unlock topic mastery tracking.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mastery-list">
+        {topics.map((topic, idx) => (
+          <div key={idx} className="mastery-row">
+            <div className="mastery-row-header">
+              <span>{topic.topic}</span>
+              <strong>{getMasteryLabel(topic.mastery)} · {topic.mastery}%</strong>
+            </div>
+            <div className="mastery-bar">
+              <div
+                className="mastery-fill"
+                style={{
+                  width: `${topic.mastery}%`,
+                  background: topic.mastery >= 80 ? '#4ecdc4' : topic.mastery >= 55 ? '#ffc857' : '#ff6b6b'
+                }}
+              ></div>
+            </div>
+            <div className="mastery-meta">
+              {topic.quiz_correct}/{topic.quiz_total} quiz answers correct · {topic.mistakes} mistakes
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderDifficultyPerformance = () => {
+    const performance = memoryData.difficulty_performance || {};
+    const levels = ['beginner', 'intermediate', 'advanced'];
+
+    return (
+      <div className="difficulty-performance-grid">
+        {levels.map(level => {
+          const data = performance[level] || { accuracy: 0, correct: 0, total: 0 };
+          return (
+            <div key={level} className="difficulty-performance-card">
+              <div className="difficulty-name">{level}</div>
+              <div className="difficulty-score">{data.accuracy}%</div>
+              <div className="difficulty-subtext">{data.correct}/{data.total} correct</div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const renderActivityTimeline = () => {
+    const activity = memoryData.recent_activity || [];
+
+    if (activity.length === 0) {
+      return (
+        <div className="empty-state">
+          <p>Recent chats and quiz mistakes will appear here.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="activity-list">
+        {activity.map((item, idx) => (
+          <div key={idx} className={`activity-item ${item.type}`}>
+            <div>
+              <strong>{item.title}</strong>
+              <p>{(item.topics || []).join(', ') || 'General Learning'}</p>
+            </div>
+            <span>{formatDate(item.timestamp)}</span>
           </div>
         ))}
       </div>
@@ -332,6 +455,27 @@ const Memory = () => {
           </div>
         </section>
 
+        <section className="memory-section">
+          <h3 className="section-title">Personalized Recommendations</h3>
+          <p className="section-hint">
+            Suggestions are generated from weak topics, quiz accuracy, and recent activity
+          </p>
+          {renderRecommendations()}
+        </section>
+
+        <section className="memory-section">
+          <h3 className="section-title">Topic Mastery Levels</h3>
+          <p className="section-hint">
+            Mastery combines quiz performance, mistakes, and learning activity
+          </p>
+          {renderTopicMastery()}
+        </section>
+
+        <section className="memory-section">
+          <h3 className="section-title">Difficulty Performance</h3>
+          {renderDifficultyPerformance()}
+        </section>
+
         {/* WEAK TOPICS SECTION */}
         <section className="memory-section">
           <h3 className="section-title">⚠️ Topics You Need to Focus On</h3>
@@ -348,6 +492,11 @@ const Memory = () => {
             Topics you've discussed with the AI
           </p>
           {renderAllTopics()}
+        </section>
+
+        <section className="memory-section">
+          <h3 className="section-title">Recent Activity Timeline</h3>
+          {renderActivityTimeline()}
         </section>
 
         {/* RECENT MISTAKES SECTION */}

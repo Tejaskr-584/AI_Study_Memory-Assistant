@@ -43,9 +43,13 @@ class UserMemory:
         # If memory file exists, load it
         if os.path.exists(self.memory_file):
             with open(self.memory_file, 'r') as f:
-                return json.load(f)
+                return self._ensure_memory_shape(json.load(f))
         
         # Otherwise, create fresh memory structure
+        return self._default_memory()
+    
+    def _default_memory(self):
+        """Create the full memory shape used by new users."""
         return {
             "user_id": self.user_id,
             "created_at": datetime.now().isoformat(),
@@ -59,9 +63,54 @@ class UserMemory:
             "stats": {
                 "total_questions_asked": 0,
                 "total_quizzes_taken": 0,
-                "topics_covered": 0
+                "topics_covered": 0,
+                "total_quiz_questions": 0,
+                "total_correct_answers": 0,
+                "current_streak": 0,
+                "best_streak": 0,
+                "last_quiz_date": None,
+                "difficulty_performance": {
+                    "beginner": {"correct": 0, "total": 0},
+                    "intermediate": {"correct": 0, "total": 0},
+                    "advanced": {"correct": 0, "total": 0}
+                }
             }
         }
+    
+    def _ensure_memory_shape(self, data):
+        """
+        Upgrade older memory.json files without deleting existing history.
+        This keeps the app compatible with saved demo data.
+        """
+        defaults = self._default_memory()
+        data.setdefault("user_id", defaults["user_id"])
+        data.setdefault("created_at", defaults["created_at"])
+        data.setdefault("topics", {})
+        data.setdefault("mistakes", [])
+        data.setdefault("chat_history", [])
+        data.setdefault("preferences", defaults["preferences"])
+        data.setdefault("stats", {})
+        
+        for key, value in defaults["preferences"].items():
+            data["preferences"].setdefault(key, value)
+        
+        for key, value in defaults["stats"].items():
+            data["stats"].setdefault(key, value)
+        
+        for difficulty, value in defaults["stats"]["difficulty_performance"].items():
+            data["stats"]["difficulty_performance"].setdefault(difficulty, value)
+        
+        for topic_data in data["topics"].values():
+            topic_data.setdefault("mention_count", 0)
+            topic_data.setdefault("mistake_count", 0)
+            topic_data.setdefault("is_weak", False)
+            topic_data.setdefault("difficulty_level", "beginner")
+            topic_data.setdefault("last_discussed", None)
+            topic_data.setdefault("quiz_correct", 0)
+            topic_data.setdefault("quiz_total", 0)
+            topic_data.setdefault("mastery_level", 0)
+        
+        return data
     
     def _save_memory(self):
         """Save current memory to JSON file."""
@@ -89,7 +138,10 @@ class UserMemory:
                 "mistake_count": 0,
                 "is_weak": False,
                 "difficulty_level": "beginner",
-                "last_discussed": None
+                "last_discussed": None,
+                "quiz_correct": 0,
+                "quiz_total": 0,
+                "mastery_level": 0
             }
         
         # Increment mention count
@@ -106,6 +158,61 @@ class UserMemory:
         self._detect_weak_topic(topic)
         
         self._save_memory()
+
+    def record_quiz_result(self, score, total, difficulty, topic_results):
+        """
+        Store quiz-level analytics after grading.
+        
+        Args:
+            score: Number of correct answers
+            total: Total submitted answers
+            difficulty: beginner, intermediate, or advanced
+            topic_results: dict like {"Operating Systems": {"correct": 2, "total": 3}}
+        """
+        stats = self.memory_data["stats"]
+        difficulty = difficulty if difficulty in stats["difficulty_performance"] else "beginner"
+        
+        stats["total_quiz_questions"] += total
+        stats["total_correct_answers"] += score
+        stats["last_quiz_date"] = datetime.now().isoformat()
+        
+        if score == total and total > 0:
+            stats["current_streak"] += 1
+        else:
+            stats["current_streak"] = 0
+        stats["best_streak"] = max(stats["best_streak"], stats["current_streak"])
+        
+        difficulty_stats = stats["difficulty_performance"][difficulty]
+        difficulty_stats["correct"] += score
+        difficulty_stats["total"] += total
+        
+        for topic, result in topic_results.items():
+            if topic not in self.memory_data["topics"]:
+                self.add_topic_mention(topic)
+            
+            topic_data = self.memory_data["topics"][topic]
+            topic_data["quiz_correct"] += result.get("correct", 0)
+            topic_data["quiz_total"] += result.get("total", 0)
+            topic_data["mastery_level"] = self._calculate_topic_mastery(topic_data)
+            topic_data["is_weak"] = topic_data["mastery_level"] < 55 or topic_data["mistake_count"] >= 2
+        
+        stats["topics_covered"] = len(self.memory_data["topics"])
+        self._save_memory()
+    
+    def _calculate_topic_mastery(self, topic_data):
+        """Estimate mastery from quiz accuracy and mistake pressure."""
+        quiz_total = topic_data.get("quiz_total", 0)
+        quiz_correct = topic_data.get("quiz_correct", 0)
+        mistake_count = topic_data.get("mistake_count", 0)
+        mention_count = topic_data.get("mention_count", 0)
+        
+        if quiz_total == 0:
+            base = min(mention_count * 12, 45)
+        else:
+            base = (quiz_correct / quiz_total) * 100
+        
+        penalty = min(mistake_count * 8, 35)
+        return max(0, min(100, round(base - penalty)))
     
     def _detect_weak_topic(self, topic):
         """
@@ -132,9 +239,13 @@ class UserMemory:
         """
         weak_topics = []
         for topic, data in self.memory_data["topics"].items():
-            if data["is_weak"]:
+            if data["is_weak"] and self._is_useful_topic(topic):
                 weak_topics.append(topic)
         return weak_topics
+    
+    def _is_useful_topic(self, topic):
+        """Hide placeholder topics from analytics and recommendations."""
+        return str(topic).strip().lower() not in {"", "unknown", "general", "general learning"}
     
     def get_topic_stats(self, topic):
         """
@@ -147,7 +258,10 @@ class UserMemory:
     
     def get_all_topics(self):
         """Get all topics user has discussed."""
-        return list(self.memory_data["topics"].keys())
+        return [
+            topic for topic in self.memory_data["topics"].keys()
+            if self._is_useful_topic(topic)
+        ]
     
     # ===================================
     # MISTAKE TRACKING
@@ -327,17 +441,128 @@ class UserMemory:
         """
         weak_topics = self.get_weak_topics()
         recent_mistakes = self.get_recent_mistakes(5)
+        stats = self.memory_data["stats"]
+        total_quiz_questions = stats.get("total_quiz_questions", 0)
+        total_correct_answers = stats.get("total_correct_answers", 0)
+        quiz_accuracy = round((total_correct_answers / total_quiz_questions) * 100, 1) if total_quiz_questions else 0
         
         return {
             "weak_topics": weak_topics,
             "total_questions": self.memory_data["stats"]["total_questions_asked"],
             "total_quizzes_taken": self.memory_data["stats"]["total_quizzes_taken"],
-            "topics_covered": self.memory_data["stats"]["topics_covered"],
+            "topics_covered": len(self.get_all_topics()),
+            "quiz_accuracy": quiz_accuracy,
+            "learning_streak": stats.get("current_streak", 0),
+            "best_streak": stats.get("best_streak", 0),
+            "strongest_topics": self.get_strongest_topics(),
+            "weakest_topics_detailed": self.get_weakest_topics_detailed(),
+            "topic_mastery": self.get_topic_mastery_levels(),
+            "difficulty_performance": self.get_difficulty_performance(),
+            "improvement_trend": self.get_improvement_trend(),
+            "recent_activity": self.get_recent_activity(),
+            "study_recommendations": self.get_study_recommendations(),
             "recent_mistakes": recent_mistakes,
             "user_preferences": self.memory_data["preferences"],
             "all_topics": self.get_all_topics(),
             "chat_history_length": len(self.memory_data["chat_history"])
         }
+    
+    def get_strongest_topics(self):
+        """Return topics with the highest mastery scores."""
+        topics = self.get_topic_mastery_levels()
+        return sorted(topics, key=lambda item: item["mastery"], reverse=True)[:3]
+    
+    def get_weakest_topics_detailed(self):
+        """Return weak topics with useful demo-friendly metadata."""
+        topics = self.get_topic_mastery_levels()
+        weak = [topic for topic in topics if topic["is_weak"] or topic["mastery"] < 60]
+        return sorted(weak, key=lambda item: item["mastery"])[:3]
+    
+    def get_topic_mastery_levels(self):
+        """Build topic mastery cards for the frontend dashboard."""
+        mastery = []
+        for topic, data in self.memory_data["topics"].items():
+            if not self._is_useful_topic(topic):
+                continue
+            mastery.append({
+                "topic": topic,
+                "mastery": data.get("mastery_level", self._calculate_topic_mastery(data)),
+                "mentions": data.get("mention_count", 0),
+                "mistakes": data.get("mistake_count", 0),
+                "quiz_total": data.get("quiz_total", 0),
+                "quiz_correct": data.get("quiz_correct", 0),
+                "is_weak": data.get("is_weak", False)
+            })
+        return sorted(mastery, key=lambda item: item["mastery"], reverse=True)
+    
+    def get_difficulty_performance(self):
+        """Return accuracy grouped by selected quiz difficulty."""
+        performance = {}
+        for difficulty, data in self.memory_data["stats"]["difficulty_performance"].items():
+            total = data.get("total", 0)
+            correct = data.get("correct", 0)
+            performance[difficulty] = {
+                "correct": correct,
+                "total": total,
+                "accuracy": round((correct / total) * 100, 1) if total else 0
+            }
+        return performance
+    
+    def get_improvement_trend(self):
+        """Simple trend summary from recent mistake volume and quiz accuracy."""
+        recent_mistakes = len(self.get_recent_mistakes(5))
+        accuracy = self.get_memory_summary_quiz_accuracy()
+        if accuracy >= 80 and recent_mistakes <= 2:
+            return "improving"
+        if recent_mistakes >= 4:
+            return "needs_revision"
+        return "steady"
+    
+    def get_memory_summary_quiz_accuracy(self):
+        """Helper to avoid repeating quiz accuracy math."""
+        stats = self.memory_data["stats"]
+        total = stats.get("total_quiz_questions", 0)
+        correct = stats.get("total_correct_answers", 0)
+        return round((correct / total) * 100, 1) if total else 0
+    
+    def get_recent_activity(self):
+        """Create a lightweight activity timeline from chats and mistakes."""
+        activity = []
+        for message in self.memory_data["chat_history"][-6:]:
+            activity.append({
+                "type": "chat",
+                "title": "Asked a study question" if message.get("role") == "user" else "Received explanation",
+                "topics": message.get("topics", []),
+                "timestamp": message.get("timestamp")
+            })
+        for mistake in self.memory_data["mistakes"][-5:]:
+            activity.append({
+                "type": "mistake",
+                "title": f"Missed a question in {mistake.get('topic', 'Unknown')}",
+                "topics": [mistake.get("topic", "Unknown")],
+                "timestamp": mistake.get("timestamp")
+            })
+        return sorted(activity, key=lambda item: item.get("timestamp") or "", reverse=True)[:6]
+    
+    def get_study_recommendations(self):
+        """Generate personalized recommendations from memory analytics."""
+        weak_topics = self.get_weakest_topics_detailed()
+        strong_topics = self.get_strongest_topics()
+        difficulty_perf = self.get_difficulty_performance()
+        recommendations = []
+        
+        if weak_topics:
+            recommendations.append(f"You should revise {weak_topics[0]['topic']} again.")
+        if strong_topics:
+            recommendations.append(f"Your strongest topic is {strong_topics[0]['topic']}.")
+        if difficulty_perf["beginner"]["accuracy"] >= 75 and difficulty_perf["intermediate"]["total"] == 0:
+            recommendations.append("Try intermediate-level quizzes next.")
+        if self.get_memory_summary_quiz_accuracy() >= 70:
+            recommendations.append("You are improving. Keep mixing chat revision with quizzes.")
+        if not recommendations:
+            recommendations.append("Start with a beginner quiz so the assistant can learn your strengths.")
+        
+        return recommendations[:4]
     
     def print_memory_status(self):
         """

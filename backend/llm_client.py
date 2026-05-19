@@ -30,16 +30,31 @@ class GeminiClient:
         self.model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
         self.enabled = bool(self.api_key and genai)
         self.client = genai.Client(api_key=self.api_key) if self.enabled else None
+        key_status = "loaded" if self.api_key else "missing"
+        package_status = "available" if genai else "not installed"
+        print(f"Gemini setup: key={key_status}, package={package_status}, model={self.model}")
 
     def is_available(self):
         return self.enabled
 
     def generate_response(self, prompt):
         if not self.enabled:
+            reason = "missing GEMINI_API_KEY" if not self.api_key else "google-genai package unavailable"
+            print(f"Gemini request skipped: {reason}")
             return None
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=prompt,
-        )
-        return (response.text or "").strip() or None
+        try:
+            print(f"Gemini request started: model={self.model}, prompt_chars={len(prompt)}")
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=prompt,
+            )
+            text = (response.text or "").strip()
+            if text:
+                print(f"Gemini response received: chars={len(text)}")
+                return text
+            print("Gemini response empty: fallback may be used")
+            return None
+        except Exception as exc:
+            print(f"Gemini API error: {exc}")
+            raise

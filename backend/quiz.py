@@ -9,7 +9,11 @@ This file handles:
 """
 
 from memory import UserMemory
+from llm_client import GeminiClient
+import json
 import random
+import re
+import time
 
 class QuizGenerator:
     """
@@ -17,7 +21,9 @@ class QuizGenerator:
     Also tracks performance and updates memory based on results.
     """
     
-    def __init__(self, memory):
+    VALID_DIFFICULTIES = {"beginner", "intermediate", "advanced"}
+    
+    def __init__(self, memory, llm_client=None):
         """
         Initialize quiz generator with memory reference.
         
@@ -25,6 +31,7 @@ class QuizGenerator:
             memory: UserMemory instance for accessing and updating user data
         """
         self.memory = memory
+        self.llm_client = llm_client if llm_client is not None else GeminiClient()
         
         # Quiz question database organized by topic and difficulty
         # Format: topic -> difficulty -> list of questions
@@ -239,9 +246,11 @@ class QuizGenerator:
     # QUIZ GENERATION
     # ===================================
     
-    def generate_quiz(self, num_questions=5):
+    def generate_quiz(self, num_questions=5, difficulty="beginner"):
         """
         Generate a personalized quiz focused on user's weak topics.
+        Gemini is used first for dynamic questions. If Gemini is unavailable
+        or the response cannot be parsed safely, the local question bank is used.
         
         Strategy:
         1. Get weak topics from memory
@@ -251,12 +260,167 @@ class QuizGenerator:
         
         Args:
             num_questions: Number of questions to generate (default: 5)
+            difficulty: beginner, intermediate, or advanced
         
         Returns: List of quiz questions
         """
+        difficulty = self._normalize_difficulty(difficulty)
+        
+        if self.llm_client and self.llm_client.is_available():
+            try:
+                ai_questions = self._generate_ai_quiz(num_questions, difficulty)
+                if ai_questions:
+                    return ai_questions[:num_questions]
+            except Exception as exc:
+                print(f"AI quiz generation failed, using fallback: {exc}")
+        
+        return self._generate_fallback_quiz(num_questions, difficulty)
+    
+    def _normalize_difficulty(self, difficulty):
+        """Keep difficulty values predictable for prompts, UI, and analytics."""
+        normalized = (difficulty or "beginner").strip().lower()
+        if normalized not in self.VALID_DIFFICULTIES:
+            return "beginner"
+        return normalized
+    
+    def _generate_ai_quiz(self, num_questions, difficulty):
+        """Ask Gemini for personalized quiz questions and validate the JSON."""
+        prompt = self._build_quiz_prompt(num_questions, difficulty)
+        raw_response = self.llm_client.generate_response(prompt)
+        if not raw_response:
+            return []
+        return self._parse_ai_questions(raw_response, num_questions, difficulty)
+    
+    def _build_quiz_prompt(self, num_questions, difficulty):
+        """Build a compact, memory-aware prompt for Gemini quiz generation."""
+        weak_topics = self._useful_topics(self.memory.get_weak_topics())
+        all_topics = self._useful_topics(self.memory.get_all_topics())
+        recent_mistakes = self.memory.get_recent_mistakes(5)
+        chat_history = self.memory.get_chat_history(8)
+        preferences = self.memory.get_preferences()
+        
+        difficulty_guidance = {
+            "beginner": "simple conceptual questions with friendly, short explanations",
+            "intermediate": "application-based questions that connect concepts to realistic scenarios",
+            "advanced": "deeper analytical or problem-solving questions with stronger reasoning"
+        }
+        
+        memory_context = {
+            "weak_topics": weak_topics,
+            "all_topics": all_topics,
+            "recent_mistakes": recent_mistakes,
+            "recent_chat_history": chat_history,
+            "learning_preferences": preferences
+        }
+        
+        return f"""
+You are generating a personalized study quiz for an AI Study Memory Assistant.
+
+Use this learner memory as context:
+{json.dumps(memory_context, indent=2)}
+
+Generate exactly {num_questions} multiple-choice quiz questions.
+Difficulty: {difficulty}
+Difficulty behavior: {difficulty_guidance[difficulty]}.
+
+Prioritize weak topics and recent mistakes. If memory is limited, use recent chat topics.
+Make questions natural, non-repetitive, and useful for a hackathon demo.
+
+Return ONLY valid JSON in this exact shape:
+{{
+  "questions": [
+    {{
+      "text": "question text",
+      "options": ["option A", "option B", "option C", "option D"],
+      "correct": 0,
+      "topic": "topic name",
+      "explanation": "why the correct answer is right"
+    }}
+  ]
+}}
+
+Rules:
+- correct must be the zero-based index of the correct option.
+- options must contain exactly 4 strings.
+- topic must be specific, such as Operating Systems, DBMS, Networking, OOPs, or Data Structures.
+- explanation should match the selected difficulty.
+"""
+    
+    def _parse_ai_questions(self, raw_response, num_questions, difficulty):
+        """Extract and validate Gemini JSON without trusting the raw text."""
+        cleaned = raw_response.strip()
+        cleaned = re.sub(r"^```(?:json)?", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"```$", "", cleaned).strip()
+        
+        try:
+            payload = json.loads(cleaned)
+        except json.JSONDecodeError:
+            match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+            if not match:
+                return []
+            payload = json.loads(match.group(0))
+        
+        if isinstance(payload, dict):
+            raw_questions = payload.get("questions", [])
+        elif isinstance(payload, list):
+            raw_questions = payload
+        else:
+            raw_questions = []
+        if not isinstance(raw_questions, list):
+            return []
+        
         questions = []
-        weak_topics = self.memory.get_weak_topics()
-        all_topics = self.memory.get_all_topics()
+        for index, question in enumerate(raw_questions[:num_questions]):
+            validated = self._validate_ai_question(question, index, difficulty)
+            if validated:
+                questions.append(validated)
+        
+        return questions
+    
+    def _validate_ai_question(self, question, index, difficulty):
+        """Normalize one generated question into the app's quiz format."""
+        if not isinstance(question, dict):
+            return None
+        
+        text = str(question.get("text", "")).strip()
+        options = question.get("options", [])
+        topic = str(question.get("topic", "General Learning")).strip() or "General Learning"
+        explanation = str(question.get("explanation", "")).strip()
+        
+        if not text or not isinstance(options, list) or len(options) != 4:
+            return None
+        
+        options = [str(option).strip() for option in options]
+        if any(not option for option in options):
+            return None
+        
+        correct = question.get("correct", question.get("correct_answer"))
+        if isinstance(correct, str):
+            correct = correct.strip()
+            if correct.isdigit():
+                correct = int(correct)
+            elif correct in options:
+                correct = options.index(correct)
+        
+        if not isinstance(correct, int) or correct < 0 or correct > 3:
+            return None
+        
+        return {
+            "id": f"ai-{int(time.time() * 1000)}-{index}",
+            "text": text,
+            "options": options,
+            "correct": correct,
+            "explanation": explanation or "Review the related concept and compare each option carefully.",
+            "topic": topic,
+            "difficulty": difficulty,
+            "source": "gemini"
+        }
+    
+    def _generate_fallback_quiz(self, num_questions=5, difficulty="beginner"):
+        """Generate a quiz from the local question bank when Gemini is unavailable."""
+        questions = []
+        weak_topics = self._useful_topics(self.memory.get_weak_topics())
+        all_topics = self._useful_topics(self.memory.get_all_topics())
         
         # If no weak topics yet, use all known topics
         if not weak_topics:
@@ -269,7 +433,7 @@ class QuizGenerator:
         weak_question_count = int(num_questions * 0.7)
         for topic in weak_topics:
             if topic in self.question_database:
-                topic_questions = self.question_database[topic].get("beginner", [])
+                topic_questions = self._get_static_questions_for_topic(topic, difficulty)
                 question_pool.extend(topic_questions)
         
         # Add questions from other topics (30% of quiz)
@@ -277,7 +441,7 @@ class QuizGenerator:
         other_topics = [t for t in self.question_database.keys() if t not in weak_topics]
         for topic in other_topics[:other_question_count]:
             if topic in self.question_database:
-                topic_questions = self.question_database[topic].get("beginner", [])
+                topic_questions = self._get_static_questions_for_topic(topic, difficulty)
                 question_pool.extend(topic_questions)
         
         # Randomly select questions from pool
@@ -288,10 +452,33 @@ class QuizGenerator:
             # Fallback: get any available questions
             for topic in self.question_database:
                 if len(questions) < num_questions:
-                    topic_questions = self.question_database[topic].get("beginner", [])
+                    topic_questions = self._get_static_questions_for_topic(topic, difficulty)
                     questions.extend(topic_questions[:num_questions - len(questions)])
         
         return questions[:num_questions]
+    
+    def _useful_topics(self, topics):
+        """Remove placeholder topics that should not drive quiz personalization."""
+        ignored_topics = {"unknown", "general", "general learning", ""}
+        return [
+            topic for topic in topics
+            if str(topic).strip().lower() not in ignored_topics
+        ]
+    
+    def _get_static_questions_for_topic(self, topic, difficulty):
+        """Return static questions for a topic, falling back to beginner if needed."""
+        topic_bank = self.question_database.get(topic, {})
+        topic_questions = topic_bank.get(difficulty) or topic_bank.get("beginner", [])
+        normalized_questions = []
+        
+        for question in topic_questions:
+            normalized_question = question.copy()
+            normalized_question["topic"] = topic
+            normalized_question["difficulty"] = difficulty
+            normalized_question["source"] = "local"
+            normalized_questions.append(normalized_question)
+        
+        return normalized_questions
     
     # ===================================
     # QUIZ SUBMISSION & GRADING
@@ -320,6 +507,8 @@ class QuizGenerator:
         score = 0
         total = len(answers)
         mistakes = []
+        topic_results = {}
+        difficulty_scores = {}
         
         # Grade each answer
         for answer in answers:
@@ -328,26 +517,40 @@ class QuizGenerator:
             correct_answer = answer.get("correct_answer")
             question_text = answer.get("question_text", "Unknown question")
             topic = answer.get("topic", "Unknown")
+            difficulty = self._normalize_difficulty(answer.get("difficulty", "beginner"))
+            options = answer.get("options", [])
+            
+            topic_results.setdefault(topic, {"correct": 0, "total": 0})
+            topic_results[topic]["total"] += 1
+            
+            difficulty_scores.setdefault(difficulty, {"correct": 0, "total": 0})
+            difficulty_scores[difficulty]["total"] += 1
             
             # Check if answer is correct
             if user_answer == correct_answer:
                 score += 1
+                topic_results[topic]["correct"] += 1
+                difficulty_scores[difficulty]["correct"] += 1
             else:
+                user_answer_text = self._option_label(user_answer, options)
+                correct_answer_text = self._option_label(correct_answer, options)
+                
                 # Record mistake
                 mistakes.append({
                     "question_id": question_id,
                     "question": question_text,
-                    "user_answer": user_answer,
-                    "correct_answer": correct_answer,
-                    "topic": topic
+                    "user_answer": user_answer_text,
+                    "correct_answer": correct_answer_text,
+                    "topic": topic,
+                    "difficulty": difficulty
                 })
                 
                 # Update memory with mistake
                 self.memory.record_mistake(
                     topic=topic,
                     question=question_text,
-                    user_answer=user_answer,
-                    correct_answer=correct_answer
+                    user_answer=user_answer_text,
+                    correct_answer=correct_answer_text
                 )
         
         # Calculate percentage
@@ -358,6 +561,11 @@ class QuizGenerator:
         
         # Update quiz stats
         self.memory.update_stats(quizzes_taken=1)
+        primary_difficulty = max(
+            difficulty_scores.items(),
+            key=lambda item: item[1]["total"]
+        )[0] if difficulty_scores else "beginner"
+        self.memory.record_quiz_result(score, total, primary_difficulty, topic_results)
         
         return {
             "score": score,
@@ -367,6 +575,12 @@ class QuizGenerator:
             "feedback": feedback,
             "memory_updated": True
         }
+    
+    def _option_label(self, answer_index, options):
+        """Convert an answer index into a readable option label."""
+        if isinstance(answer_index, int) and 0 <= answer_index < len(options):
+            return options[answer_index]
+        return "No answer selected" if answer_index is None else answer_index
     
     def _generate_feedback(self, percentage, mistakes):
         """

@@ -16,6 +16,8 @@ from flask_cors import CORS
 from memory import UserMemory
 from ai_logic import AILogic
 from quiz import QuizGenerator
+import json
+import re
 import sys
 import traceback
 
@@ -50,6 +52,13 @@ ai_logic = AILogic(user_memory)
 
 # Initialize quiz generator with memory
 quiz_generator = QuizGenerator(user_memory)
+
+# Cache Gemini recommendations so the memory dashboard can refresh often
+# without making a model call on every poll.
+recommendations_cache = {
+    "signature": None,
+    "recommendations": None
+}
 
 print("\n✅ All systems initialized!")
 print(f"   📚 Memory: {user_memory.memory_file}")
@@ -120,6 +129,61 @@ def validate_request_data(required_fields):
         wrapper.__name__ = f.__name__
         return wrapper
     return decorator
+
+
+def useful_topics(topics):
+    """Filter placeholder topics before sending personalization hints to the UI."""
+    ignored_topics = {"unknown", "general", "general learning", ""}
+    return [
+        topic for topic in topics
+        if str(topic).strip().lower() not in ignored_topics
+    ]
+
+
+def get_ai_recommendations(memory_summary):
+    """Use Gemini to phrase personalized study recommendations when available."""
+    if not ai_logic.llm_client.is_available():
+        return memory_summary.get("study_recommendations", [])
+    
+    signature_payload = {
+        "weak_topics": memory_summary.get("weak_topics", []),
+        "strongest_topics": memory_summary.get("strongest_topics", []),
+        "quiz_accuracy": memory_summary.get("quiz_accuracy", 0),
+        "difficulty_performance": memory_summary.get("difficulty_performance", {}),
+        "recent_mistakes": memory_summary.get("recent_mistakes", [])[-3:],
+    }
+    signature = json.dumps(signature_payload, sort_keys=True)
+    
+    if recommendations_cache["signature"] == signature:
+        return recommendations_cache["recommendations"]
+    
+    prompt = f"""
+You are a study coach for an AI Study Memory Assistant.
+Use this learning analytics data:
+{json.dumps(signature_payload, indent=2)}
+
+Return ONLY valid JSON:
+{{"recommendations": ["short recommendation 1", "short recommendation 2", "short recommendation 3"]}}
+
+Make the recommendations specific, encouraging, and useful for the next study action.
+"""
+    
+    try:
+        raw_response = ai_logic.llm_client.generate_response(prompt)
+        payload_text = raw_response.strip()
+        payload_text = re.sub(r"^```(?:json)?", "", payload_text, flags=re.IGNORECASE).strip()
+        payload_text = re.sub(r"```$", "", payload_text).strip()
+        payload = json.loads(payload_text)
+        recommendations = payload.get("recommendations", [])
+        if isinstance(recommendations, list) and recommendations:
+            cleaned = [str(item).strip() for item in recommendations if str(item).strip()]
+            recommendations_cache["signature"] = signature
+            recommendations_cache["recommendations"] = cleaned[:4]
+            return recommendations_cache["recommendations"]
+    except Exception as exc:
+        print(f"Gemini recommendations failed, using analytics recommendations: {exc}")
+    
+    return memory_summary.get("study_recommendations", [])
 
 # ===================================
 # API ENDPOINTS
@@ -224,6 +288,7 @@ def get_memory():
     try:
         # Get memory summary
         memory_summary = user_memory.get_memory_summary()
+        memory_summary["study_recommendations"] = get_ai_recommendations(memory_summary)
         
         return success_response(
             memory_summary,
@@ -239,13 +304,14 @@ def get_memory():
 @app.route('/api/quiz', methods=['GET'])
 def generate_quiz():
     """
-    GET /api/quiz?num_questions=5
+    GET /api/quiz?num_questions=5&difficulty=beginner
     
-    Generates a personalized quiz focused on weak topics.
-    Weak topics get 70% of questions, other topics get 30%.
+    Generates a personalized Gemini-powered quiz focused on weak topics,
+    recent mistakes, chat history, and memory data.
     
     QUERY PARAMETERS:
     - num_questions: Number of questions (default: 5, min: 1, max: 20)
+    - difficulty: beginner, intermediate, or advanced
     
     RESPONSE JSON:
     {
@@ -263,20 +329,26 @@ def generate_quiz():
             ],
             "total_questions": 5,
             "weak_topics": ["Operating Systems"],
-            "personalization_note": "70% weak topics, 30% review"
+            "difficulty": "beginner",
+            "quiz_source": "gemini",
+            "personalization_note": "AI-generated from weak topics, mistakes, and chat history"
         }
     }
     """
     try:
-        # Get num_questions from query parameters
+        # Get query parameters
         num_questions = request.args.get('num_questions', 5, type=int)
+        difficulty = request.args.get('difficulty', 'beginner').strip().lower()
         
         # Validate
         if num_questions < 1 or num_questions > 20:
             return error_response("num_questions must be between 1 and 20", 400)
         
+        if difficulty not in QuizGenerator.VALID_DIFFICULTIES:
+            return error_response("difficulty must be beginner, intermediate, or advanced", 400)
+        
         # Generate quiz
-        questions = quiz_generator.generate_quiz(num_questions)
+        questions = quiz_generator.generate_quiz(num_questions, difficulty)
         
         # Format response
         formatted_questions = []
@@ -287,15 +359,23 @@ def generate_quiz():
                 "options": q["options"],
                 "correct": q["correct"],  # Note: This is the correct answer index
                 "explanation": q.get("explanation", ""),
-                "topic": q.get("topic", "Unknown")
+                "topic": q.get("topic", "Unknown"),
+                "difficulty": q.get("difficulty", difficulty),
+                "source": q.get("source", "local")
             })
+        
+        quiz_source = "gemini" if any(q.get("source") == "gemini" for q in questions) else "local"
         
         return success_response(
             {
                 "questions": formatted_questions,
                 "total_questions": len(formatted_questions),
-                "weak_topics": user_memory.get_weak_topics(),
-                "personalization_note": "70% weak topics, 30% review"
+                "weak_topics": useful_topics(user_memory.get_weak_topics()),
+                "difficulty": difficulty,
+                "quiz_source": quiz_source,
+                "personalization_note": "AI-generated from weak topics, mistakes, and chat history"
+                if quiz_source == "gemini"
+                else "Local fallback quiz focused on weak topics and review"
             },
             "Quiz generated successfully"
         )
@@ -397,7 +477,7 @@ def reset_memory():
     }
     """
     try:
-        global user_memory, ai_logic, quiz_generator
+        global user_memory, ai_logic, quiz_generator, recommendations_cache
         
         # Delete memory file
         import os
@@ -408,6 +488,7 @@ def reset_memory():
         user_memory = UserMemory(user_id="default", memory_file="memory.json")
         ai_logic = AILogic(user_memory)
         quiz_generator = QuizGenerator(user_memory)
+        recommendations_cache = {"signature": None, "recommendations": None}
         
         print("🔄 Memory reset to fresh state")
         

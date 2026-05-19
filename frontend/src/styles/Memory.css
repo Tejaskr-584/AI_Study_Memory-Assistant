@@ -279,6 +279,150 @@
 }
 
 /* ===================================
+   SMART ANALYTICS
+   =================================== */
+
+.recommendation-list,
+.mastery-list,
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.recommendation-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.22);
+  border-radius: 10px;
+}
+
+.recommendation-dot {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  background: #00d4ff;
+  border-radius: 50%;
+  box-shadow: 0 0 14px rgba(0, 212, 255, 0.8);
+}
+
+.recommendation-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.mastery-row {
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.mastery-row-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.mastery-row-header strong {
+  color: #00d4ff;
+  white-space: nowrap;
+}
+
+.mastery-bar {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.mastery-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+
+.mastery-meta {
+  margin-top: 8px;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 12px;
+}
+
+.difficulty-performance-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.difficulty-performance-card {
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.difficulty-name {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.difficulty-score {
+  margin-top: 8px;
+  color: #00d4ff;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.difficulty-subtext {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+}
+
+.activity-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 3px solid #00d4ff;
+  border-radius: 8px;
+}
+
+.activity-item.mistake {
+  border-left-color: #ff6b6b;
+}
+
+.activity-item strong {
+  display: block;
+  color: #fff;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.activity-item p,
+.activity-item span {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 12px;
+}
+
+.activity-item span {
+  white-space: nowrap;
+}
+
+/* ===================================
    TOPIC CARDS
    =================================== */
 
@@ -588,6 +732,10 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
+  .difficulty-performance-grid {
+    grid-template-columns: 1fr;
+  }
+
   .section-title {
     font-size: 18px;
   }
@@ -627,6 +775,11 @@
   .mistake-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .mastery-row-header,
+  .activity-item {
+    flex-direction: column;
   }
 
   .section-title {

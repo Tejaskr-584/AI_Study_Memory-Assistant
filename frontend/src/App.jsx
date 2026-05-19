@@ -137,7 +137,7 @@ function App() {
       <footer className="app-footer">
         <div className="footer-content">
           <p className="footer-text">
-            Built for AI Agent Hackathon 2026 • React + Flask + adaptive memory demo
+            Learn smarter with personalized AI guidance
           </p>
           <div className="footer-links">
             <a href="#" className="footer-link">GitHub</a>
@@ -151,3 +151,4 @@ function App() {
 }
 
 export default App
+

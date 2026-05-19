@@ -34,6 +34,12 @@ const Quiz = () => {
   // Quiz results after submission
   const [quizResults, setQuizResults] = useState(null);
 
+  // Selected quiz difficulty level
+  const [difficulty, setDifficulty] = useState('beginner');
+
+  // Metadata returned by backend about personalization and source
+  const [quizMeta, setQuizMeta] = useState(null);
+
   // Whether data is being fetched
   const [isLoading, setIsLoading] = useState(false);
 
@@ -65,12 +71,15 @@ const Quiz = () => {
       setError('');
       setIsLoading(true);
 
-      const response = await fetch(`${BACKEND_URL}/api/quiz?num_questions=${numQuestions}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
+      const response = await fetch(
+        `${BACKEND_URL}/api/quiz?num_questions=${numQuestions}&difficulty=${difficulty}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
         }
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`Backend error: ${response.status}`);
@@ -79,6 +88,12 @@ const Quiz = () => {
       const payload = await response.json();
       const data = payload.data;
       setQuestions(data.questions || []);
+      setQuizMeta({
+        difficulty: data.difficulty,
+        quizSource: data.quiz_source,
+        personalizationNote: data.personalization_note,
+        weakTopics: data.weak_topics || []
+      });
       setUserAnswers({});
       setCurrentQuestionIndex(0);
       setQuizState('taking');
@@ -105,6 +120,8 @@ const Quiz = () => {
         question_id: q.id,
         question_text: q.text,
         topic: q.topic,
+        difficulty: q.difficulty || difficulty,
+        options: q.options,
         user_answer: userAnswers[q.id] !== undefined ? userAnswers[q.id] : null,
         correct_answer: q.correct
       }));
@@ -185,6 +202,7 @@ const Quiz = () => {
     setCurrentQuestionIndex(0);
     setUserAnswers({});
     setQuizResults(null);
+    setQuizMeta(null);
     setError('');
   };
 
@@ -229,6 +247,23 @@ const Quiz = () => {
           </div>
 
           <div className="difficulty-selector">
+            <h3>Choose difficulty</h3>
+            <div className="level-buttons">
+              {['beginner', 'intermediate', 'advanced'].map(level => (
+                <button
+                  key={level}
+                  type="button"
+                  className={`level-btn ${difficulty === level ? 'active' : ''}`}
+                  onClick={() => setDifficulty(level)}
+                  disabled={isLoading}
+                >
+                  {level.charAt(0).toUpperCase() + level.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="difficulty-selector">
             <h3>How many questions?</h3>
             <div className="difficulty-buttons">
               <button
@@ -255,7 +290,7 @@ const Quiz = () => {
             </div>
           </div>
 
-          {isLoading && <div className="loading-text">⏳ Generating personalized quiz...</div>}
+          {isLoading && <div className="loading-text">Generating AI-powered quiz...</div>}
         </div>
       </div>
     );
@@ -275,6 +310,16 @@ const Quiz = () => {
       <div className="quiz-taking">
         {/* Progress bar */}
         <div className="quiz-progress">
+          {quizMeta && (
+            <div className="quiz-meta">
+              <span>{quizMeta.difficulty}</span>
+              <span>{quizMeta.quizSource === 'gemini' ? 'Gemini generated' : 'Local fallback'}</span>
+              {quizMeta.weakTopics.length > 0 && (
+                <span>Focused on {quizMeta.weakTopics.slice(0, 2).join(', ')}</span>
+              )}
+            </div>
+          )}
+
           <div className="progress-bar-container">
             <div
               className="progress-fill"
@@ -310,7 +355,10 @@ const Quiz = () => {
         <div className="question-container">
           <div className="question-header">
             <h3>{currentQuestion.text}</h3>
-            <span className="question-topic">{currentQuestion.topic}</span>
+            <div className="question-tags">
+              <span className="question-topic">{currentQuestion.topic}</span>
+              <span className="question-difficulty">{currentQuestion.difficulty}</span>
+            </div>
           </div>
 
           {/* Answer options */}

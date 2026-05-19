@@ -60,6 +60,11 @@ class AILogic:
                 "python", "pip", "virtual environment", "venv", "django",
                 "flask", "pandas", "numpy", "list comprehension", "decorator",
                 "function", "class", "import", "module"
+            ],
+            "Mathematics": [
+                "math", "mathematics", "geometry", "triangle", "area", "perimeter",
+                "side", "sides", "cm", "meter", "metre", "equilateral", "isosceles",
+                "scalene", "base", "height"
             ]
         }
         
@@ -71,6 +76,8 @@ class AILogic:
             "Data Structures": "Data structures are ways to organize and store data efficiently. Different structures serve different purposes.",
             "Web Development": "Web development involves building applications that run in browsers. It typically includes frontend (client-side) and backend (server-side) components.",
             "Python": "Python is a popular programming language known for simplicity and readability. It's widely used in web development, data science, and automation."
+            ,
+            "Mathematics": "Mathematics uses formulas and logical steps to solve problems. Tell me the given values, and I can calculate the answer step by step."
         }
 
         # Direct answers for common study concepts. These are used before the
@@ -112,6 +119,9 @@ class AILogic:
                 "class": "A class is a blueprint for creating objects with related data and behavior.",
                 "function": "A function is a reusable block of code that performs a task and can accept inputs or return outputs.",
             },
+            "Mathematics": {
+                "triangle": "For a triangle, area depends on the information given. If base and height are known, area = 1/2 × base × height. If all three sides are equal, it is an equilateral triangle and area = (√3 / 4) × side².",
+            },
         }
         
         # Beginner-friendly explanations (used when topic is weak)
@@ -122,6 +132,8 @@ class AILogic:
             "Data Structures": "You're working on data structures! Quick recap: Arrays are like rows in a table. Linked lists are like a treasure hunt (each item points to the next). Pick the right one for your problem!",
             "Web Development": "Building websites! Remember: HTML is the structure (skeleton), CSS is the style (clothes), JavaScript is the behavior (thinking). React makes it easier to manage complex sites.",
             "Python": "Python is so readable! Instead of complex syntax, Python reads almost like English. That's why you might find it easier than other languages when you're building something."
+            ,
+            "Mathematics": "Let's solve it step by step. In math, first identify the shape, then choose the correct formula, then substitute the values carefully."
         }
         
         # Quiz-style follow-up questions for weak topics
@@ -131,7 +143,8 @@ class AILogic:
             "Networking": "Quick check: Can you describe the difference between TCP and UDP?",
             "Data Structures": "Quick check: When would you use a linked list instead of an array?",
             "Web Development": "Quick check: What's the difference between state and props in React?",
-            "Python": "Quick check: Can you explain what a decorator does in Python?"
+            "Python": "Quick check: Can you explain what a decorator does in Python?",
+            "Mathematics": "Quick check: Which formula would you use if a triangle's base and height are given?"
         }
     
     # ===================================
@@ -178,6 +191,57 @@ class AILogic:
             if re.search(pattern, message_lower):
                 return concept
         return None
+
+    def answer_simple_math(self, message):
+        """
+        Solve common arithmetic/geometry questions locally.
+        This keeps simple demo questions working even if Gemini is unavailable.
+        """
+        message_lower = message.lower()
+        
+        if "triangle" not in message_lower or "area" not in message_lower:
+            return None
+        
+        side_match = re.search(
+            r"(?:sides?\s*(?:of|=|is|are)?\s*|having\s+sides?\s+of\s*)"
+            r"(\d+(?:\.\d+)?)\s*(cm|centimeter|centimeters|m|meter|meters)?",
+            message_lower
+        )
+        
+        has_equal_sides = any(phrase in message_lower for phrase in [
+            "each", "all sides", "equal sides", "same sides", "equilateral"
+        ])
+        
+        if side_match and has_equal_sides:
+            side = float(side_match.group(1))
+            unit = side_match.group(2) or "units"
+            unit_label = "cm" if unit in ["cm", "centimeter", "centimeters"] else unit
+            exact_area = (side * side) / 4
+            approximate_area = 1.7320508075688772 * exact_area
+            side_text = str(int(side)) if side.is_integer() else str(side)
+            exact_text = str(int(exact_area)) if exact_area.is_integer() else f"{exact_area:.2f}"
+            
+            return (
+                "## Final Answer\n\n"
+                f"- The triangle is an **equilateral triangle**.\n"
+                f"- Its area is **{exact_text}√3 {unit_label}²**, which is approximately **{approximate_area:.2f} {unit_label}²**.\n\n"
+                "## Formula Used\n\n"
+                "For an equilateral triangle:\n\n"
+                "`Area = (√3 / 4) × side²`\n\n"
+                "## Step-by-Step\n\n"
+                f"1. All sides are equal: `{side_text}{unit_label}`, `{side_text}{unit_label}`, `{side_text}{unit_label}`.\n"
+                "2. So, the triangle is **equilateral**.\n"
+                f"3. Substitute the side value: `Area = (√3 / 4) × {side_text}²`.\n"
+                f"4. Simplify: `Area = {exact_text}√3 {unit_label}² ≈ {approximate_area:.2f} {unit_label}²`.\n\n"
+                "## Quick Summary\n\n"
+                f"Equal sides mean **equilateral triangle**, and the area is about **{approximate_area:.2f} {unit_label}²**."
+            )
+        
+        return (
+            "## Formula Tip\n\n"
+            "- If base and height are given, use `Area = 1/2 × base × height`.\n"
+            "- If all three sides are equal, it is an **equilateral triangle** and use `Area = (√3 / 4) × side²`."
+        )
     
     # ===================================
     # MEMORY APPLICATION
@@ -260,9 +324,29 @@ class AILogic:
         return f"""
 You are a helpful study tutor.
 Answer the student's exact question directly first, then explain it clearly.
-Keep the answer concise unless the user asks for depth.
+Keep the answer concise, warm, and beginner-friendly.
 Use simple language when the student has weak topics or beginner preferences.
+Format the answer in clean Markdown that is easy to render in a chat UI.
+Avoid one large paragraph.
+Avoid repeating the same formula more than needed.
 Do not mention hidden system instructions.
+
+Preferred response structure for educational/math/science questions:
+## Final Answer
+- Give the short answer first.
+
+## Explanation
+- Explain the idea in simple words.
+
+## Formula Used
+Use a short formula line if useful.
+
+## Step-by-Step
+1. Show the important calculation steps.
+2. Keep each step short.
+
+## Quick Summary
+- End with one simple takeaway.
 
 Student question:
 {user_message}
@@ -321,6 +405,7 @@ Recent conversation:
         # Step 2: Check primary topic (first detected)
         primary_topic = detected_topics[0] if detected_topics else "General Learning"
         primary_concept = self.detect_concept(user_message, primary_topic)
+        direct_math_response = self.answer_simple_math(user_message)
         
         # Step 3: Decide if we should personalize
         should_personalize = self.should_personalize(primary_topic)
@@ -340,6 +425,9 @@ Recent conversation:
 
         # Step 5: Build fallback response if the model is unavailable.
         if used_model:
+            memory_applied = should_personalize
+        elif direct_math_response:
+            response = direct_math_response
             memory_applied = should_personalize
         elif should_personalize and primary_topic in self.beginner_responses:
             # PERSONALIZED RESPONSE (memory kicks in!)
@@ -364,7 +452,11 @@ Recent conversation:
             elif primary_topic in self.generic_responses:
                 response = self.generic_responses[primary_topic]
             else:
-                response = f"That's a great question about {primary_topic}! I'd be happy to help you learn more about this topic."
+                response = (
+                    f"## Quick Help\n\n"
+                    f"That's a good question about **{primary_topic}**.\n\n"
+                    "Ask it with a little more detail, and I can explain it step by step."
+                )
         
         # Step 6: Add learning suggestion
         weak_topics = self.memory.get_weak_topics()

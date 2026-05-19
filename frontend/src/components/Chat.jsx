@@ -14,6 +14,171 @@ import React, { useState, useRef, useEffect } from 'react';
 import { BACKEND_URL } from '../api';
 import '../styles/Chat.css';
 
+const renderInlineMarkdown = (text) => {
+  const parts = [];
+  const pattern = /(\*\*[^*]+\*\*|`[^`]+`|\$[^$]+\$)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    const token = match[0];
+    const key = `${match.index}-${token}`;
+
+    if (token.startsWith('**')) {
+      parts.push(<strong key={key}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith('`')) {
+      parts.push(<code key={key} className="inline-code">{token.slice(1, -1)}</code>);
+    } else if (token.startsWith('$')) {
+      parts.push(<span key={key} className="inline-math">{token.slice(1, -1)}</span>);
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts;
+};
+
+const flushParagraph = (blocks, paragraphLines, keyPrefix) => {
+  if (paragraphLines.length === 0) return;
+  const paragraph = paragraphLines.join(' ').trim();
+  if (paragraph) {
+    blocks.push(
+      <p key={`${keyPrefix}-p-${blocks.length}`} className="md-paragraph">
+        {renderInlineMarkdown(paragraph)}
+      </p>
+    );
+  }
+  paragraphLines.length = 0;
+};
+
+const renderMarkdownMessage = (content) => {
+  const lines = String(content || '').replace(/\r\n/g, '\n').split('\n');
+  const blocks = [];
+  const paragraphLines = [];
+  let listItems = [];
+  let orderedItems = [];
+  let codeLines = [];
+  let inCodeBlock = false;
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      blocks.push(
+        <ul key={`ul-${blocks.length}`} className="md-list">
+          {listItems.map((item, idx) => (
+            <li key={idx}>{renderInlineMarkdown(item)}</li>
+          ))}
+        </ul>
+      );
+      listItems = [];
+    }
+
+    if (orderedItems.length > 0) {
+      blocks.push(
+        <ol key={`ol-${blocks.length}`} className="md-list ordered">
+          {orderedItems.map((item, idx) => (
+            <li key={idx}>{renderInlineMarkdown(item)}</li>
+          ))}
+        </ol>
+      );
+      orderedItems = [];
+    }
+  };
+
+  lines.forEach((rawLine, index) => {
+    const line = rawLine.trim();
+
+    if (line.startsWith('```')) {
+      flushParagraph(blocks, paragraphLines, 'code');
+      flushList();
+      if (inCodeBlock) {
+        blocks.push(
+          <pre key={`code-${blocks.length}`} className="md-code-block">
+            <code>{codeLines.join('\n')}</code>
+          </pre>
+        );
+        codeLines = [];
+      }
+      inCodeBlock = !inCodeBlock;
+      return;
+    }
+
+    if (inCodeBlock) {
+      codeLines.push(rawLine);
+      return;
+    }
+
+    if (!line) {
+      flushParagraph(blocks, paragraphLines, 'blank');
+      flushList();
+      return;
+    }
+
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      flushParagraph(blocks, paragraphLines, 'heading');
+      flushList();
+      const HeadingTag = headingMatch[1].length === 1 ? 'h2' : 'h3';
+      blocks.push(
+        <HeadingTag key={`h-${index}`} className="md-heading">
+          {renderInlineMarkdown(headingMatch[2])}
+        </HeadingTag>
+      );
+      return;
+    }
+
+    const bulletMatch = line.match(/^[-*]\s+(.+)$/);
+    if (bulletMatch) {
+      flushParagraph(blocks, paragraphLines, 'bullet');
+      orderedItems = [];
+      listItems.push(bulletMatch[1]);
+      return;
+    }
+
+    const orderedMatch = line.match(/^\d+\.\s+(.+)$/);
+    if (orderedMatch) {
+      flushParagraph(blocks, paragraphLines, 'ordered');
+      listItems = [];
+      orderedItems.push(orderedMatch[1]);
+      return;
+    }
+
+    const looksLikeFormula = /[=≈√×²]/.test(line) && line.length < 120;
+    if (looksLikeFormula) {
+      flushParagraph(blocks, paragraphLines, 'formula');
+      flushList();
+      blocks.push(
+        <div key={`formula-${index}`} className="formula-line">
+          {renderInlineMarkdown(line)}
+        </div>
+      );
+      return;
+    }
+
+    paragraphLines.push(line);
+  });
+
+  flushParagraph(blocks, paragraphLines, 'end');
+  flushList();
+
+  if (codeLines.length > 0) {
+    blocks.push(
+      <pre key={`code-${blocks.length}`} className="md-code-block">
+        <code>{codeLines.join('\n')}</code>
+      </pre>
+    );
+  }
+
+  return <div className="markdown-message">{blocks}</div>;
+};
+
 const Chat = () => {
   // ===================================
   // STATE MANAGEMENT
@@ -186,7 +351,11 @@ const Chat = () => {
       <div key={index} className={`message-container ${isUser ? 'user' : 'assistant'}`}>
         {/* Message bubble */}
         <div className={`message-bubble ${isUser ? 'user-bubble' : 'assistant-bubble'}`}>
-          <p className="message-text">{message.content}</p>
+          {isUser ? (
+            <p className="message-text">{message.content}</p>
+          ) : (
+            renderMarkdownMessage(message.content)
+          )}
 
           {/* Memory-applied indicator for assistant messages */}
           {!isUser && message.memoryApplied && (

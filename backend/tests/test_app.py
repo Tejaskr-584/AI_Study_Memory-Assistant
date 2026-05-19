@@ -28,6 +28,31 @@ class FakeUnavailableClient:
         return None
 
 
+class FakeQuizGeminiClient:
+    def is_available(self):
+        return True
+
+    def generate_response(self, prompt):
+        return """
+        {
+          "questions": [
+            {
+              "text": "In a round-robin scheduler, what does the time quantum control?",
+              "options": [
+                "How long each process can run before preemption",
+                "How much disk space a process receives",
+                "How many files a process can open",
+                "How often memory is refreshed"
+              ],
+              "correct": 0,
+              "topic": "Operating Systems",
+              "explanation": "The time quantum is the fixed CPU time slice given to a process before the scheduler may switch to another process."
+            }
+          ]
+        }
+        """
+
+
 class AppFlowTests(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -35,7 +60,7 @@ class AppFlowTests(unittest.TestCase):
         memory = UserMemory(memory_file=memory_path)
         app.user_memory = memory
         app.ai_logic = AILogic(memory, llm_client=FakeUnavailableClient())
-        app.quiz_generator = QuizGenerator(memory)
+        app.quiz_generator = QuizGenerator(memory, llm_client=FakeUnavailableClient())
         self.client = app.app.test_client()
 
     def tearDown(self):
@@ -72,9 +97,41 @@ class AppFlowTests(unittest.TestCase):
         self.assertEqual(response.json["data"]["score"], 1)
         self.assertEqual(response.json["data"]["total"], 1)
 
+    def test_quiz_accepts_difficulty_and_uses_gemini_when_available(self):
+        app.quiz_generator = QuizGenerator(app.user_memory, llm_client=FakeQuizGeminiClient())
+
+        response = self.client.get("/api/quiz?num_questions=1&difficulty=advanced")
+        data = response.json["data"]
+        question = data["questions"][0]
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data["difficulty"], "advanced")
+        self.assertEqual(data["quiz_source"], "gemini")
+        self.assertEqual(question["source"], "gemini")
+        self.assertEqual(question["difficulty"], "advanced")
+        self.assertEqual(len(question["options"]), 4)
+
+    def test_quiz_rejects_invalid_difficulty(self):
+        response = self.client.get("/api/quiz?num_questions=1&difficulty=expert")
+
+        self.assertEqual(response.status_code, 400)
+
     def test_chat_answers_specific_concept(self):
         response = self.client.post("/api/chat", json={"message": "What is a process?"})
         self.assertIn("program that is currently running", response.json["data"]["response"])
+
+    def test_chat_solves_equilateral_triangle_area_without_model(self):
+        response = self.client.post(
+            "/api/chat",
+            json={"message": "what is the area of the triangle having sides of 6cm each?"},
+        )
+
+        answer = response.json["data"]["response"]
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("equilateral triangle", answer.lower())
+        self.assertIn("9√3", answer)
+        self.assertIn("15.59", answer)
+        self.assertIn("Mathematics", response.json["data"]["topics_detected"])
 
     def test_chat_uses_model_when_available(self):
         app.ai_logic = AILogic(app.user_memory, llm_client=FakeGeminiClient())
