@@ -1,54 +1,58 @@
-# AI Study Memory Assistant
+# AI Study Memory Assistant 🧠
 
-AI Study Memory Assistant is an adaptive learning companion that remembers weak topics, tracks quiz mistakes, and uses that learning history to make future study help more personalized.
+AI Study Memory Assistant is an intelligent adaptive learning platform that remembers user learning patterns, tracks weak topics, analyzes quiz performance, and delivers personalized AI-powered study support in real time.
 
-The project combines a React frontend, a Flask backend, a lightweight memory engine, adaptive quizzes, and optional Gemini-powered responses.
-
----
-
-## Features
-
-- Memory-aware study chat
-- Optional Gemini API integration for natural answers
-- Fallback response engine when no API key is configured
-- Weak-topic detection from repeated questions and quiz mistakes
-- Personalized quiz generation
-- Recent mistake tracking
-- Real-time memory dashboard
-- Demo reset flow for clean presentations
-- Fixed chat layout with internal message scrolling
+The system continuously improves the learning experience by adapting explanations, generating personalized quizzes, and identifying areas where the student needs more practice.
 
 ---
 
-## How It Works
+## ✨ Features
+
+- 💬 AI-powered study chat
+- 🧠 Memory-aware personalized responses
+- 📊 Weak-topic detection
+- 📝 Adaptive quiz generation
+- 📈 Real-time learning progress tracking
+- 🔄 Continuous learning loop
+- 🎯 Beginner-friendly explanations
+- 🧪 Mistake analysis and tracking
+- ⚡ Gemini-powered intelligent responses
+- 🌙 Modern responsive dark UI
+- 🔁 Demo reset functionality
+- 📚 Personalized learning experience
+
+---
+
+## 🚀 How It Works
 
 ```text
-Chat -> Memory -> Quiz -> Mistake Tracking -> Personalized Learning
+Chat → Memory → Quiz → Mistake Tracking → Personalized Learning
 ```
 
-1. The student asks study questions.
-2. The backend detects topics and stores learning activity.
-3. Repeated topics or quiz mistakes become weak areas.
-4. Quizzes prioritize those weak areas.
-5. Future answers use memory context to adapt explanations.
-6. If Gemini is configured, answers can cover topics beyond the built-in fallback set.
+1. The student asks study-related questions.
+2. The system tracks topics, learning patterns, and mistakes.
+3. Weak areas are automatically identified.
+4. Personalized quizzes are generated dynamically.
+5. Quiz performance updates the learning memory.
+6. Future responses become more adaptive and personalized.
+7. AI-generated explanations improve based on user history.
 
 ---
 
-## Tech Stack
+## 🛠 Tech Stack
 
 | Layer | Technology |
 |---|---|
 | Frontend | React + Vite |
 | Backend | Flask |
-| AI | Gemini API optional, fallback engine built in |
-| Memory | JSON-based local memory |
+| AI Engine | Gemini API |
+| Memory System | JSON-based adaptive memory |
 | Styling | CSS |
 | Testing | Python unittest |
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
 ```text
 .
@@ -60,6 +64,7 @@ Chat -> Memory -> Quiz -> Mistake Tracking -> Personalized Learning
 │   ├── quiz.py
 │   ├── requirements.txt
 │   └── tests/
+│
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
@@ -68,6 +73,7 @@ Chat -> Memory -> Quiz -> Mistake Tracking -> Personalized Learning
 │   │   └── App.jsx
 │   ├── package.json
 │   └── vite.config.js
+│
 ├── .env.example
 ├── QUICKSTART.md
 └── README.md
@@ -75,75 +81,13 @@ Chat -> Memory -> Quiz -> Mistake Tracking -> Personalized Learning
 
 ---
 
-## Setup
+## 🎮 Demo Flow
 
-Clone the repository, then install backend and frontend dependencies.
+### Step 1 — Study Chat
 
-Both servers are required for local development. The frontend only handles the user interface, while the backend provides chat responses, memory tracking, quiz generation, and Gemini API communication.
-
-```text
-Frontend: http://127.0.0.1:5173
-Backend:  http://127.0.0.1:5000
-```
-
-### Backend
-
-```bash
-cd backend
-pip install -r requirements.txt
-python app.py
-```
-
-Backend runs on:
-
-```text
-http://127.0.0.1:5000
-```
-
-### Frontend
-
-Open a second terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev -- --host 127.0.0.1
-```
-
-Frontend runs on:
-
-```text
-http://127.0.0.1:5173
-```
-
----
-
-## Gemini Setup
-
-Gemini is optional. The app still works without it using the fallback response engine.
-
-To enable Gemini:
-
-1. Copy `.env.example` to `.env`.
-2. Add your Gemini API key.
+Ask repeated questions about the same topic.
 
 Example:
-
-```env
-GEMINI_API_KEY=your_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-```
-
-Do not commit `.env` or real API keys.
-
----
-
-## Demo Flow
-
-Use this flow for a hackathon demo:
-
-1. Click **Reset Demo**.
-2. Ask repeated questions about one topic:
 
 ```text
 What is a process?
@@ -151,60 +95,78 @@ Explain context switching.
 How do threads work?
 ```
 
-3. Open the Memory tab and show the weak topic.
-4. Take a quiz.
-5. Submit at least one wrong answer.
-6. Return to Memory and show the mistake history.
-7. Ask a new topic outside the fallback set, such as:
+---
+
+### Step 2 — Memory Tracking
+
+The system automatically detects weak topics and stores learning history.
+
+---
+
+### Step 3 — Adaptive Quiz
+
+Take a personalized quiz generated from weak areas and previous mistakes.
+
+---
+
+### Step 4 — Personalized Learning
+
+Future responses become simpler, smarter, and more personalized based on user performance.
+
+---
+
+## 🧠 Core Concept
+
+The project demonstrates a complete adaptive learning loop:
 
 ```text
-Explain photosynthesis simply.
+Chat → Memory → Quiz → Personalized AI Learning
 ```
 
-If Gemini is configured, the app should answer naturally.
+The assistant continuously learns from user interactions to provide smarter and more effective study support over time.
 
 ---
 
-## Testing
+## 📊 Main Modules
 
-Run backend tests:
-
-```bash
-python -m unittest backend.tests.test_app
-```
-
-Build the frontend:
-
-```bash
-cd frontend
-npm run build
-```
+| Module | Purpose |
+|---|---|
+| AI Chat System | Handles intelligent study conversations |
+| Memory Engine | Tracks weak topics and learning history |
+| Quiz System | Generates adaptive quizzes |
+| Personalization Logic | Creates customized responses |
+| Analytics Tracking | Monitors mistakes and improvements |
 
 ---
 
-## Current Limitations
+## 🎯 Use Cases
 
-- Memory is stored locally in JSON.
-- There is no user authentication yet.
-- Quiz questions are from a local question bank.
-- Topic detection is lightweight and keyword-based.
-- Gemini requires a valid API key.
-
----
-
-## Future Improvements
-
-- User accounts and cloud memory storage
-- SQLite or database-backed persistence
-- Better semantic topic detection
-- Larger quiz question bank
-- Spaced repetition scheduling
-- Analytics dashboard
-- Voice input
-- Mobile app polish
+- Personalized learning assistant
+- Smart tutoring systems
+- AI-powered study companion
+- Adaptive revision platform
+- Educational memory-tracking system
+- Student performance improvement tool
 
 ---
 
-## Goal
+## 🔮 Future Improvements
 
-The goal of this project is to show a complete adaptive learning loop where the assistant does not only answer questions, but also remembers learning patterns and helps students improve over time.
+- Cloud-based memory storage
+- User authentication system
+- Voice interaction support
+- Semantic topic understanding
+- Mobile application support
+- Spaced repetition learning system
+
+---
+
+## 🏆 Goal
+
+The goal of this project is to create an AI learning assistant that not only answers questions, but also remembers learning behavior, adapts to user needs, and helps students improve continuously through personalized AI-driven education.
+
+---
+
+## ⭐ AI Study Memory Assistant
+
+An adaptive AI learning platform that transforms normal study interactions into personalized and intelligent learning experiences.
