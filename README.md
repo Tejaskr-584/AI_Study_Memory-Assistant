@@ -79,6 +79,13 @@ Chat -> Memory -> Quiz -> Mistake Tracking -> Personalized Learning
 
 Clone the repository, then install backend and frontend dependencies.
 
+Both servers are required for local development. The frontend only handles the user interface, while the backend provides chat responses, memory tracking, quiz generation, and Gemini API communication.
+
+```text
+Frontend: http://127.0.0.1:5173
+Backend:  http://127.0.0.1:5000
+```
+
 ### Backend
 
 ```bash
