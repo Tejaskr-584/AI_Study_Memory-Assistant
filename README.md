@@ -51,43 +51,10 @@ AI-Study-Memory-Assistant/
 
 ---
 
-# ⚙️ Installation
-
-## Backend Setup
-
-```bash
-cd backend
-pip install flask flask-cors
-python app.py
-```
-
-Backend runs on:
-
-```bash
-http://localhost:5000
-```
-
----
-
-## Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Frontend runs on:
-
-```bash
-http://localhost:5173
-```
-
----
-
 # 🎮 Demo Flow
 
 ## Step 1 — Chat
+
 Ask the same topic multiple times.
 
 Example:
@@ -101,16 +68,19 @@ Explain context switching.
 ---
 
 ## Step 2 — Memory
+
 The system automatically detects weak topics and updates learning statistics.
 
 ---
 
 ## Step 3 — Quiz
+
 Take a personalized quiz focused on weak areas.
 
 ---
 
 ## Step 4 — Adaptive Responses
+
 Future explanations become simpler and more personalized based on mistakes and learning history.
 
 ---
